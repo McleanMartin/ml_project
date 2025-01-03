@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block ml_block %}
+<section class="py-5 text-center container">
+    <div class="row py-lg-5">
+        <div class="col-lg-6 col-md-8 mx-auto">
+            <h1 class="fw-light">Diagnosis Result</h1>
+            <p class="lead text-muted">Thank you for using our disease scanning tool. Here are the results based on the image you uploaded:</p>
+            {% comment %} <h5 class="text-success">Predicted Disease: {{ diagnosis.disease.name }}</h5> {% endcomment %}
+            <p class="text-muted">Confidence Level: {{ confidence_level|floatformat:2 }}%</p>
+            
+            <p>
+                <a href="{% url 'ml_analyze' %}" class="btn btn-primary my-2">Scan Again</a>
+            </p>
+        </div>
+    </div>
+</section>
+{% endblock ml_block %}

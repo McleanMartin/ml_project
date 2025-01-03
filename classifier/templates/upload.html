@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block ml_block %}
+<section class="py-5 text-center container">
+    <div class="row py-lg-5">
+        <div class="col-lg-6 col-md-8 mx-auto">
+            <h1 class="fw-light">Diseases Scanning</h1>
+            <p class="lead text-muted">Harness the power of technology to identify and analyze various diseases through image scanning. Upload your images below to get insights and support for your health journey.</p>
+            <div class="card p-4 shadow-sm">
+                <div>
+                    <h5 class="my-2">Upload Image</h5>
+                    <form method="post" action="{% url 'ml_analyze' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <input type="file" name="image" class="form-control form-control-sm" aria-label="Small file input example" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary my-2">Analyze</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock ml_block %}

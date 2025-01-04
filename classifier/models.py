@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 
 class Disease(models.Model):
+    dn = models.IntegerField()
     name = models.CharField(max_length=225, verbose_name="Disease Name")
     description = models.TextField(verbose_name="Disease Description")
     symptoms = models.ManyToManyField('Symptom', verbose_name="Symptoms")

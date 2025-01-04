@@ -28,20 +28,20 @@ def upload_image(request):
 
             # Make prediction
             prediction = model.predict(img_array)
-            predicted_class = np.argmax(prediction)
+            predicted_class = np.argmax(prediction) 
             confidence_level = np.max(prediction)
 
             # Save to Diagnosis
-            # diagnosis = Diagnosis.objects.create(
-            #     disease=Disease.objects.get(pk=predicted_class),
-            #     image=Image(image=image_file),
-            #     confidence_level=confidence_level
-            # )
+            diagnosis = Diagnosis.objects.create(
+                disease=Disease.objects.get(pk=(predicted_class + 1)),
+                image=Image(image=image_file),
+                confidence_level=confidence_level
+            )
 
             result = {
-                # 'diagnosis': diagnosis,
+                'diagnosis': diagnosis,
                 'confidence_level': confidence_level,
-                # 'predicted_class': diagnosis.disease.name
+                'predicted_class': diagnosis.disease.name
             }
 
             return render(request,'results.html',{'confidence_level':confidence_level})

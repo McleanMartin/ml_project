@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block ml_block %}
+<body>
+    <h1>Diagnostic Statistics</h1>
+    <img src="data:image/png;base64,{{ graph }}" alt="Diagnostic Statistics Graph">
+</body>
+{% endblock %}

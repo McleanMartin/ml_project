@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% block title %}scan-results{% endblock title %}
 {% block ml_block %}
 <section class="py-5 text-center container">
     <div class="row py-lg-5">
         <div class="col-lg-6 col-md-8 mx-auto">
             <h1 class="fw-light">Diagnosis Result</h1>
             <p class="lead text-muted">Thank you for using our disease scanning tool. Here are the results based on the image you uploaded:</p>
-            <h5 class="text-success">Predicted Disease: {{ result.predicted_class }}</h5>
-            <p class="text-muted">Confidence Level: {{ result.confidence_level|floatformat:2 }}</p>
-            <p class="text-muted">Disease Description: {{ result.disease_description }}</p>
-            <p class="text-muted">Symptoms: {{ result.disease_symptoms }}</p>
+            <h5 class="text-success"><strong>Predicted Disease:</strong> {{ result.predicted_class }}</h5>
+            <p class="text-muted"><tsrong>Confidence Level:</strong> {{ result.confidence_level|floatformat:2 }}</p>
+            <p class="text-muted"><strong>Disease Description:</strong></br> {{ result.disease_description }}</p>
+            <p class="text-muted"><strong>Symptoms:</strong> {{ result.disease.symptoms }}</p>
+            <p class="text-muted"><strong>Additional Notes:</strong> {{ result.disease.notes }}</p>
             <p>
                 <a href="{% url 'ml_analyze' %}" class="btn btn-primary my-2">Scan Again</a>
             </p>
@@ -24,7 +25,7 @@
                 {% for scan in result.previous_scan %}
                     <div class="col">
                         <div class="card shadow-sm">
-                            <img src="{{ scan.image.image.url }}" alt="Diagnosis Image" class="card-img-top" style="width: 100%; height: 225px; object-fit: cover;">
+                            <img src="{{ scan.image.image.url }}" alt="Image from previous scan of {{ scan.disease.name }}" class="card-img-top" style="width: 100%; height: 225px; object-fit: cover;">
 
                             <div class="card-body">
                                 <p class="card-text">{{ scan }}</p>

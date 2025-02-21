@@ -52,25 +52,13 @@
   {% if messages %}
     <div class="alert-container">
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            <div class="alert alert-warning">{{ message }}</div>
         {% endfor %}
     </div>
   {% endif %}
   {% block ml_block %}{% endblock ml_block %}
 
 </main>
-
-<footer class="text-muted py-5">
-  <div class="container">
-    <p class="float-end mb-1">
-      <a href="#">Back to top</a>
-    </p>
-  </div>
-</footer>
-
-
-    <script src="{% static "js/bootstrap.bundle.min.js" %}"></script>
-
-      
+  <script src="{% static "js/bootstrap.bundle.min.js" %}"></script>    
   </body>
 </html>

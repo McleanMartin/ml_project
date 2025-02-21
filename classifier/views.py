@@ -1,23 +1,22 @@
 import os
-import matplotlib.pyplot as plt
 import io
 import base64
 from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import FileSystemStorage
 from django.contrib import messages  
 from .models import Disease, Image, Diagnosis
-from keras.models import load_model  # type: ignore
+from keras.models import load_model  
 import numpy as np
 from PIL import Image as PILImage
 from ml_project.settings import BASE_DIR
+import matplotlib.pyplot as plt
 
 # Load the model
 model = load_model(os.path.join(BASE_DIR, 'maize_disease_model.h5'))
 
 def process_image(filepath):
     """Process the uploaded image for prediction."""
-    img = PILImage.open(filepath)
-    img = img.resize((128, 128))
+    img = PILImage.open(filepath).resize((128, 128))
     img_array = np.array(img) / 255.0
     return img_array.reshape(1, 128, 128, 3)
 
@@ -43,12 +42,14 @@ def upload_image(request):
             disease = get_object_or_404(Disease, pk=(predicted_class + 1))
 
             # Save to Diagnosis
+            diagnosis_image = Image.objects.create(image=image_file)
             diagnosis = Diagnosis.objects.create(
                 disease=disease,
-                image=Image.objects.create(image=image_file),
+                image=diagnosis_image,
                 confidence_level=confidence_level
             )
 
+            # Fetch previous scans
             previous_scan = Diagnosis.objects.all().order_by('-created_at')
 
             result = {
@@ -58,6 +59,7 @@ def upload_image(request):
                 'predicted_class': diagnosis.disease.name,
                 'disease_description': diagnosis.disease.description,
                 'symptoms': diagnosis.disease.symptoms,
+                'notes': diagnosis.disease.notes,
             }
             return render(request, 'results.html', {'result': result})
 
@@ -71,15 +73,10 @@ def upload_image(request):
 
     return render(request, 'upload.html', {'result': result})
 
-
 def diagnostic_stats(request):
-    # Get all diseases and their corresponding diagnosis counts
+    """Generate and render diagnostic statistics."""
     diseases = Disease.objects.all()
-    disease_counts = {}
-
-    for disease in diseases:
-        count = Diagnosis.objects.filter(disease=disease).count()
-        disease_counts[disease.name] = count
+    disease_counts = {disease.name: Diagnosis.objects.filter(disease=disease).count() for disease in diseases}
 
     # Create a bar chart
     plt.figure(figsize=(10, 5))
@@ -91,6 +88,7 @@ def diagnostic_stats(request):
     
     # Save the plot to a BytesIO object
     buffer = io.BytesIO()
+    plt.tight_layout()  # Ensure the layout is tight for better appearance
     plt.savefig(buffer, format='png')
     buffer.seek(0)
     image_png = buffer.getvalue()

@@ -7,6 +7,7 @@ class Disease(models.Model):
     name = models.CharField(max_length=225, verbose_name="Disease Name")
     description = models.TextField(verbose_name="Disease Description")
     symptoms = models.TextField()
+    notes = models.TextField()
 
     def __str__(self):
         return self.name

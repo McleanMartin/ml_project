@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
+{% block title %}Scan{% endblock title %}
 {% block ml_block %}
 <section class="py-5 text-center container">
     <div class="row py-lg-5">
@@ -13,7 +13,7 @@
                     <form method="post" action="{% url 'ml_analyze' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="mb-3">
-                            <input type="file" name="image" class="form-control form-control-sm" aria-label="Small file input example" required>
+                            <input type="file" name="image" class="form-control form-control-sm" aria-label="Upload your image" accept=".jpg, .jpeg, .png" required>
                         </div>
                         <button type="submit" class="btn btn-primary my-2">Analyze</button>
                     </form>

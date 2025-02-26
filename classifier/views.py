@@ -3,6 +3,7 @@ import io
 import base64
 from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import FileSystemStorage
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages  
 from .models import Disease, Image, Diagnosis
 from keras.models import load_model  
@@ -19,6 +20,8 @@ def process_image(filepath):
     img = PILImage.open(filepath).resize((128, 128))
     img_array = np.array(img) / 255.0
     return img_array.reshape(1, 128, 128, 3)
+
+
 
 def upload_image(request):
     result = None  
@@ -49,8 +52,17 @@ def upload_image(request):
                 confidence_level=confidence_level
             )
 
-            # Fetch previous scans
+            # Fetch previous scans with pagination
             previous_scan = Diagnosis.objects.all().order_by('-created_at')
+            paginator = Paginator(previous_scan, 6) 
+            page = request.GET.get('page') 
+
+            try:
+                previous_scan = paginator.page(page)
+            except PageNotAnInteger:
+                previous_scan = paginator.page(1)
+            except EmptyPage:
+                previous_scan = paginator.page(paginator.num_pages)
 
             result = {
                 'previous_scan': previous_scan,

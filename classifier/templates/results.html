@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}scan-results{% endblock title %}
+{% block title %}Scan Results{% endblock title %}
 {% block ml_block %}
 <section class="py-5 text-center container">
     <div class="row py-lg-5">
@@ -8,10 +8,10 @@
             <h1 class="fw-light">Diagnosis Result</h1>
             <p class="lead text-muted">Thank you for using our disease scanning tool. Here are the results based on the image you uploaded:</p>
             <h5 class="text-success"><strong>Predicted Disease:</strong> {{ result.predicted_class }}</h5>
-            <p class="text-muted"><tsrong>Confidence Level:</strong> {{ result.confidence_level|floatformat:2 }}</p>
-            <p class="text-muted"><strong>Disease Description:</strong></br> {{ result.disease_description }}</p>
-            <p class="text-muted"><strong>Symptoms:</strong> {{ result.disease.symptoms }}</p>
-            <p class="text-muted"><strong>Additional Notes:</strong> {{ result.disease.notes }}</p>
+            <p class="text-muted"><strong>Confidence Level:</strong> {{ result.confidence_level|floatformat:2 }}%</p>
+            <p class="text-muted"><strong>Disease Description:</strong><br> {{ result.disease_description|default:"No description available." }}</p>
+            <p class="text-muted"><strong>Symptoms:</strong> {{ result.disease.symptoms|default:"No symptoms available." }}</p>
+            <p class="text-muted"><strong>Additional Notes:</strong> {{ result.disease.notes|default:"No additional notes available." }}</p>
             <p>
                 <a href="{% url 'ml_analyze' %}" class="btn btn-primary my-2">Scan Again</a>
             </p>
@@ -25,8 +25,13 @@
                 {% for scan in result.previous_scan %}
                     <div class="col">
                         <div class="card shadow-sm">
-                            <img src="{{ scan.image.image.url }}" alt="Image from previous scan of {{ scan.disease.name }}" class="card-img-top" style="width: 100%; height: 225px; object-fit: cover;">
-
+                            {% if scan.image.image.url %}
+                                <img src="{{ scan.image.image.url }}" alt="Image from previous scan of {{ scan.disease.name }}" class="card-img-top" style="width: 100%; height: 225px; object-fit: cover;">
+                            {% else %}
+                                <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="width: 100%; height: 225px;">
+                                    <p class="text-white mb-0">No image available</p>
+                                </div>
+                            {% endif %}
                             <div class="card-body">
                                 <p class="card-text">{{ scan }}</p>
                                 <div class="d-flex justify-content-between align-items-center">
@@ -37,9 +42,46 @@
                     </div>
                 {% endfor %}
             {% else %}
-                <p>No previous scans available.</p>
+                <div class="col-12 text-center">
+                    <p class="text-muted">No previous scans available.</p>
+                </div>
             {% endif %}
         </div>
+
+        <!-- Pagination Links -->
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if result.previous_scan.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ result.previous_scan.previous_page_number }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">&laquo;</span>
+                    </li>
+                {% endif %}
+
+                {% for num in result.previous_scan.paginator.page_range %}
+                    <li class="page-item {% if result.previous_scan.number == num %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                    </li>
+                {% endfor %}
+
+                {% if result.previous_scan.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ result.previous_scan.next_page_number }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">&raquo;</span>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
     </div>
 </div>
 {% endblock ml_block %}

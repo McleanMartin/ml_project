@@ -22,5 +22,8 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', v.upload_image, name="ml_analyze"),
+    path('accounts/login/', v.Login_View.as_view(), name="login"),
+    path('accounts/register/', v.register_view, name="register"),
+    path('accounts/logout/', v.logout_view, name="logout"),
     path('stats/', v.diagnostic_stats, name="stats"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

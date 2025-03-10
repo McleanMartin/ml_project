@@ -33,3 +33,8 @@ class Diagnosis(models.Model):
 
     def __str__(self):
         return f"Diagnosis of {self.disease} with confidence {self.confidence_level:.2f}"
+
+
+    class Meta:
+        verbose_name = "Diagnosis"
+        verbose_name_plural = "Diagnosis"

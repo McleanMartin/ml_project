@@ -8,7 +8,7 @@
             <h1 class="fw-light">Diagnosis Result</h1>
             <p class="lead text-muted">Thank you for using our disease scanning tool. Here are the results based on the image you uploaded:</p>
             <h5 class="text-success"><strong>Predicted Disease:</strong> {{ result.predicted_class }}</h5>
-            <p class="text-muted"><strong>Confidence Level:</strong> {{ result.confidence_level|floatformat:2 }}%</p>
+            <p class="text-muted"><strong>Confidence Level:</strong> {{ result.confidence_level|floatformat:2 }}</p>
             <p class="text-muted"><strong>Disease Description:</strong><br> {{ result.disease_description|default:"No description available." }}</p>
             <p class="text-muted"><strong>Symptoms:</strong> {{ result.disease.symptoms|default:"No symptoms available." }}</p>
             <p class="text-muted"><strong>Additional Notes:</strong> {{ result.disease.notes|default:"No additional notes available." }}</p>

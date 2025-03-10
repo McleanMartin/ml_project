@@ -1,7 +1,7 @@
 import os
 import io
 import base64
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404,redirect
 from django.core.files.storage import FileSystemStorage
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages  
@@ -11,8 +11,13 @@ import numpy as np
 from PIL import Image as PILImage
 from ml_project.settings import BASE_DIR
 import matplotlib.pyplot as plt
+from .forms import LoginForm,RegisterForm
+from django.contrib.auth import login,logout,aauthenticate
+from django.contrib.auth.models import User
+from django.contrib.auth.views import LoginView
+from django.contrib.auth.decorators import login_required
 
-# Load the model
+# Load the trained dataset
 model = load_model(os.path.join(BASE_DIR, 'maize_disease_model.h5'))
 
 def process_image(filepath):
@@ -22,7 +27,7 @@ def process_image(filepath):
     return img_array.reshape(1, 128, 128, 3)
 
 
-
+@login_required
 def upload_image(request):
     result = None  
     
@@ -54,7 +59,7 @@ def upload_image(request):
 
             # Fetch previous scans with pagination
             previous_scan = Diagnosis.objects.all().order_by('-created_at')
-            paginator = Paginator(previous_scan, 6) 
+            paginator = Paginator(previous_scan, 10) 
             page = request.GET.get('page') 
 
             try:
@@ -85,6 +90,7 @@ def upload_image(request):
 
     return render(request, 'upload.html', {'result': result})
 
+@login_required
 def diagnostic_stats(request):
     """Generate and render diagnostic statistics."""
     diseases = Disease.objects.all()
@@ -94,13 +100,13 @@ def diagnostic_stats(request):
     plt.figure(figsize=(10, 5))
     plt.bar(disease_counts.keys(), disease_counts.values(), color='skyblue')
     plt.xlabel('Diseases')
-    plt.ylabel('Number of Diagnoses')
-    plt.title('Number of Diagnoses per Disease')
+    plt.ylabel('Number of Diagnosis')
+    plt.title('Number of Diagnosis per Disease')
     plt.xticks(rotation=45)
     
     # Save the plot to a BytesIO object
     buffer = io.BytesIO()
-    plt.tight_layout()  # Ensure the layout is tight for better appearance
+    plt.tight_layout()
     plt.savefig(buffer, format='png')
     buffer.seek(0)
     image_png = buffer.getvalue()
@@ -110,3 +116,29 @@ def diagnostic_stats(request):
     graph = base64.b64encode(image_png).decode('utf-8')
     
     return render(request, 'diagnostic_stats.html', {'graph': graph})
+
+
+class Login_View(LoginView):
+    template_name = 'login.html'
+
+
+def register_view(request):
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = User.objects.create_user(
+                username=request.POST['username'],
+                email=request.POST['email'],
+                password=request.POST['password']
+            )
+            
+            messages.success(request, 'Client account created successfully!')
+            return redirect('login') 
+    else:
+        form = RegisterForm()
+    return render(request, 'register.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('ml_analyze')

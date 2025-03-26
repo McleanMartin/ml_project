@@ -18,8 +18,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 
-# Load maize classification model
-model = load_model('model.h5')
+model_path = os.path.join(settings.BASE_DIR, 'classifier', 'model.h5')
+model = load_model(model_path)
 
 def process_image(filepath):
     """Process the image for prediction."""

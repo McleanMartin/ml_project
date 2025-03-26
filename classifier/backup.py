@@ -1,8 +1,8 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.optimizers import Adam
 
@@ -71,6 +71,40 @@ history = model.fit(
 
 # Save the trained model
 model.save('maize_disease_model.h5')
+
+# Load the trained model
+model = load_model('maize_disease_model.h5')
+
+# Function to predict if an image is maize or not
+def predict_maize(image_path):
+    img = load_img(image_path, target_size=(128, 128))
+    img_array = img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    
+    prediction = model.predict(img_array)
+    predicted_class = np.argmax(prediction, axis=1)
+    
+    # Assuming class 0 is maize
+    return predicted_class == 0
+
+# Function to filter non-maize images
+def filter_non_maize_images(image_folder):
+    maize_images = []
+    non_maize_images = []
+    
+    for img_name in os.listdir(image_folder):
+        img_path = os.path.join(image_folder, img_name)
+        if predict_maize(img_path):
+            maize_images.append(img_name)
+        else:
+            non_maize_images.append(img_name)
+    
+    return maize_images, non_maize_images
+
+# Example usage
+maize_images, non_maize_images = filter_non_maize_images(test_dir)
+print(f"Maize images: {maize_images}")
+print(f"Non-maize images: {non_maize_images}")
 
 # Plot training & validation accuracy and loss
 plt.figure(figsize=(12, 4))

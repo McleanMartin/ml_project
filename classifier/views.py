@@ -4,6 +4,7 @@ import base64
 from django.shortcuts import render, get_object_or_404,redirect
 from django.core.files.storage import FileSystemStorage
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from django.contrib import messages  
 from .models import Disease, Image, Diagnosis
 from keras.models import load_model  
@@ -17,17 +18,34 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 
-# Load the trained dataset
-model = load_model(os.path.join(BASE_DIR, 'maize_disease_model.h5'))
+from django.core.files.storage import FileSystemStorage
+from django.shortcuts import render, get_object_or_404
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib import messages
+import os
+import numpy as np
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.models import load_model
+from .models import Disease, Diagnosis, Image
+
+# Load maize classification model
+model = load_model('model.h5')
 
 def process_image(filepath):
-    """Process the uploaded image for prediction."""
-    img = PILImage.open(filepath).resize((128, 128))
-    img_array = np.array(img) / 255.0
-    return img_array.reshape(1, 128, 128, 3)
+    """Process the image for prediction."""
+    img = load_img(filepath, target_size=(128, 128))
+    img_array = img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    return img_array
 
+def predict_maize_or_not(image_path):
+    """Predict if the image is maize or not."""
+    img_array = process_image(image_path)
+    prediction = model.predict(img_array)
+    predicted_class = np.argmax(prediction, axis=1)
+    confidence_level = float(np.max(prediction))
+    return predicted_class, confidence_level
 
-@login_required
 def upload_image(request):
     result = None  
     
@@ -38,10 +56,17 @@ def upload_image(request):
         filepath = os.path.join(fs.location, filename)
 
         try:
-            # Process the image
+            # Check if the image is maize or not
+            predicted_class, confidence_level = predict_maize_or_not(filepath)
+            
+            if predicted_class == 1:
+                messages.error(request, "The uploaded image is not a maize image.")
+                return render(request, 'upload.html', {'result': result})
+
+            # If the image is maize, proceed with disease prediction
             img_array = process_image(filepath)
 
-            # Make prediction
+            # Make disease prediction
             prediction = model.predict(img_array)
             predicted_class = np.argmax(prediction)
             confidence_level = float(np.max(prediction))

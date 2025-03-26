@@ -18,16 +18,6 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 
-from django.core.files.storage import FileSystemStorage
-from django.shortcuts import render, get_object_or_404
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.contrib import messages
-import os
-import numpy as np
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import load_model
-from .models import Disease, Diagnosis, Image
-
 # Load maize classification model
 model = load_model('model.h5')
 

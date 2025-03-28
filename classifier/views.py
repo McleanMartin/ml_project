@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import io
 import base64
+import tempfile
 from PIL import Image as PILImage
 from django.shortcuts import render, get_object_or_404, redirect
 from django.core.files.storage import FileSystemStorage
@@ -39,7 +40,7 @@ class MaizeImageValidator:
             raise ValueError(f"No valid reference images in {self.reference_dir}")
 
     def _load_reference_features(self):
-        """Load and process reference maize leaf images"""
+        """Load and process reference maize leaf images with robust loading"""
         features = []
         if not os.path.exists(self.reference_dir):
             os.makedirs(self.reference_dir)
@@ -49,16 +50,25 @@ class MaizeImageValidator:
             if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
                 try:
                     img_path = os.path.join(self.reference_dir, img_file)
-                    img = cv2.imread(img_path)
-                    if img is not None:
-                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                        img = cv2.resize(img, (300, 300))
-                        
-                        features.append({
-                            'hist': self._get_color_histogram(img),
-                            'shape': self._get_shape_features(img),
-                            'texture': self._get_texture_features(img)
-                        })
+                    # Use PIL for more robust loading
+                    pil_img = PILImage.open(img_path).convert('RGB')
+                    img = np.array(pil_img)
+                    
+                    # Handle different bit depths
+                    if img.dtype == 'uint16':
+                        img = (img / 256).astype('uint8')
+                    elif img.dtype in ['float32', 'float64']:
+                        img = (img * 255).astype('uint8')
+                    
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    img = cv2.resize(img, (300, 300))
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    
+                    features.append({
+                        'hist': self._get_color_histogram(img),
+                        'shape': self._get_shape_features(img),
+                        'texture': self._get_texture_features(img)
+                    })
                 except Exception as e:
                     print(f"Error processing reference {img_file}: {str(e)}")
         return features
@@ -122,15 +132,22 @@ class MaizeImageValidator:
                 0.01 < shape_features[1] < 0.2)
 
     def validate_maize_image(self, img_path):
-        """Comprehensive maize leaf validation"""
+        """Comprehensive maize leaf validation with robust image loading"""
         try:
-            # Load and preprocess image
-            img = cv2.imread(img_path)
-            if img is None:
-                return False, 0.0, "Invalid image file"
+            # Load with PIL first (more robust for different formats)
+            pil_img = PILImage.open(img_path)
+            img = np.array(pil_img.convert('RGB'))
+            
+            # Handle different data types
+            if img.dtype == 'uint16':
+                img = (img / 256).astype('uint8')
+            elif img.dtype in ['float32', 'float64']:
+                img = (img * 255).astype('uint8')
                 
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Continue with OpenCV processing
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = cv2.resize(img, (300, 300))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
             # Initial checks
             if not self._is_green_plant(img):
@@ -178,74 +195,106 @@ except Exception as e:
     maize_validator = None
 
 def process_image(filepath, target_size=(128, 128)):
-    """Efficient image processing"""
-    img = load_img(filepath, target_size=target_size)
-    img_array = img_to_array(img) / 255.0
-    return np.expand_dims(img_array, axis=0)
+    """Robust image processing that handles different bit depths"""
+    try:
+        # First try with PIL (handles most formats)
+        img = PILImage.open(filepath)
+        img = img.convert('RGB')  # Ensure RGB format
+        img = img.resize(target_size)
+        
+        # Convert to numpy array and check range
+        img_array = np.array(img)
+        
+        # Handle different data types
+        if img_array.dtype == 'uint16':
+            img_array = (img_array / 256).astype('uint8')
+        elif img_array.dtype == 'float32' or img_array.dtype == 'float64':
+            if img_array.max() <= 1.0:  # If normalized 0-1
+                img_array = (img_array * 255).astype('uint8')
+            else:  # If values exceed 1.0
+                img_array = cv2.normalize(img_array, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        
+        # Final normalization for model
+        img_array = img_array.astype('float32') / 255.0
+        return np.expand_dims(img_array, axis=0)
+        
+    except Exception as e:
+        print(f"Error processing {filepath}: {str(e)}")
+        raise
 
 @login_required
 def upload_image(request):
     if request.method == 'POST' and request.FILES.get('image'):
-        image_file = request.FILES['image']
-        
-        # Basic file validation
-        if not image_file.name.lower().endswith(('.png', '.jpg', '.jpeg')):
-            messages.error(request, "Only JPEG/PNG images allowed")
-            return render(request, 'upload.html')
-            
-        if image_file.size > 10 * 1024 * 1024:  # 10MB max
-            messages.error(request, "Image too large (max 10MB)")
-            return render(request, 'upload.html')
-        
-        fs = FileSystemStorage()
-        filename = fs.save(image_file.name, image_file)
-        filepath = os.path.join(fs.location, filename)
-
         try:
-            # Strict maize validation
-            if maize_validator:
-                is_maize, confidence, err = maize_validator.validate_maize_image(filepath)
-                if not is_maize:
-                    os.remove(filepath)
-                    msg = err if err else (
-                        f"Image rejected (confidence: {confidence:.2%}). "
-                        "Please upload a clear photo of a maize leaf."
-                    )
-                    messages.error(request, msg)
-                    return render(request, 'upload.html')
+            image_file = request.FILES['image']
             
-            # Only process if validation passed
-            img_array = process_image(filepath)
-            prediction = disease_model.predict(img_array, verbose=0)
-            class_idx = np.argmax(prediction)
-            confidence = float(np.max(prediction))
+            # Validate file type
+            valid_extensions = ['.png', '.jpg', '.jpeg']
+            if not any(image_file.name.lower().endswith(ext) for ext in valid_extensions):
+                messages.error(request, "Only JPEG/PNG images allowed")
+                return render(request, 'upload.html')
+                
+            if image_file.size > 10 * 1024 * 1024:  # 10MB max
+                messages.error(request, "Image too large (max 10MB)")
+                return render(request, 'upload.html')
             
-            # Save results
-            disease = get_object_or_404(Disease, pk=class_idx+1)
-            img_record = Image.objects.create(image=image_file)
-            diagnosis = Diagnosis.objects.create(
-                disease=disease,
-                image=img_record,
-                confidence_level=confidence
-            )
+            # Save to temp file first for validation
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
+                for chunk in image_file.chunks():
+                    tmp.write(chunk)
+                tmp_path = tmp.name
             
-            # Prepare results
-            result = {
-                'diagnosis': diagnosis,
-                'confidence_level': confidence,
-                'predicted_class': disease.name,
-                'disease_description': disease.description,
-                'symptoms': disease.symptoms,
-                'notes': disease.notes,
-                'image_url': img_record.image.url
-            }
-            
-            return render(request, 'results.html', {'result': result})
-            
+            try:
+                # Strict maize validation
+                if maize_validator:
+                    is_maize, confidence, err = maize_validator.validate_maize_image(tmp_path)
+                    if not is_maize:
+                        msg = err if err else (
+                            f"Image rejected (confidence: {confidence:.2%}). "
+                            "Please upload a clear photo of a maize leaf."
+                        )
+                        messages.error(request, msg)
+                        return render(request, 'upload.html')
+                
+                # Only process if validation passed
+                img_array = process_image(tmp_path)
+                prediction = disease_model.predict(img_array, verbose=0)
+                class_idx = np.argmax(prediction)
+                confidence = float(np.max(prediction))
+                
+                # Save to permanent storage
+                fs = FileSystemStorage()
+                filename = fs.save(image_file.name, image_file)
+                
+                # Save results
+                disease = get_object_or_404(Disease, pk=class_idx+1)
+                img_record = Image.objects.create(image=filename)
+                diagnosis = Diagnosis.objects.create(
+                    disease=disease,
+                    image=img_record,
+                    confidence_level=confidence
+                )
+                
+                # Prepare results
+                result = {
+                    'diagnosis': diagnosis,
+                    'confidence_level': confidence,
+                    'predicted_class': disease.name,
+                    'disease_description': disease.description,
+                    'symptoms': disease.symptoms,
+                    'notes': disease.notes,
+                    'image_url': img_record.image.url
+                }
+                
+                return render(request, 'results.html', {'result': result})
+                
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                    
         except Exception as e:
-            if os.path.exists(filepath):
-                os.remove(filepath)
             messages.error(request, f"Processing error: {str(e)}")
+            return render(request, 'upload.html')
     
     return render(request, 'upload.html')
 
@@ -268,10 +317,8 @@ def diagnostic_stats(request):
     plt.savefig(buffer, format='png')
     buffer.seek(0)
     image_png = buffer.getvalue()
-    buffer.close()
-    
-    graph = base64.b64encode(image_png).decode('utf-8')
-    return render(request, 'diagnostic_stats.html', {'graph': graph})
+    buffer.close
+
 
 class Login_View(LoginView):
     template_name = 'login.html'

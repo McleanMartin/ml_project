@@ -1,4 +1,5 @@
 import os
+import io
 import cv2
 import numpy as np
 from PIL import Image as PILImage
@@ -12,6 +13,7 @@ from .models import Disease, Image, Diagnosis
 from django.contrib.auth import login, logout,authenticate
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
+import matplotlib.pyplot as plt
 
 # Disable GPU usage
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -131,8 +133,8 @@ class StrictMaizeValidator:
     def _is_green_plant(self, img):
         """Check if image contains sufficient green plant material"""
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        lower_green = np.array([35, 40, 40])  # Lower bound for green in HSV
-        upper_green = np.array([85, 255, 255]) # Upper bound for green in HSV
+        lower_green = np.array([35, 40, 40]) 
+        upper_green = np.array([85, 255, 255]) 
         mask = cv2.inRange(hsv, lower_green, upper_green)
         green_pixels = cv2.countNonZero(mask)
         return (green_pixels / (img.shape[0] * img.shape[1])) >= self.min_green_percentage

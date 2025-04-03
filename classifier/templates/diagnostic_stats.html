@@ -14,44 +14,38 @@
         <div class="card-header bg-primary text-white">
             <h2 class="card-title mb-0">Diagnostic Graph</h2>
         </div>
-        <div class="card-body text-center">
-            <img src="data:image/png;base64,{{ graph }}" alt="Diagnostic Statistics Graph" class="img-fluid rounded">
+        <div class="card-body">
+            <canvas id="diagnosticChart"></canvas>
         </div>
     </div>
-
-    {% comment %} <!-- Additional Information Section -->
-    <div class="row mt-5 g-4">
-        <div class="col-md-6">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-info text-white">
-                    <h3 class="card-title mb-0">Key Insights</h3>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled">
-                        <li><strong>Total Cases:</strong> 1,234</li>
-                        <li><strong>Positive Cases:</strong> 567</li>
-                        <li><strong>Negative Cases:</strong> 667</li>
-                        <li><strong>Accuracy:</strong> 92.5%</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-success text-white">
-                    <h3 class="card-title mb-0"></h3>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled">
-                        <li>Increase testing in high-risk areas.</li>
-                        <li>Focus on early detection and prevention.</li>
-                        <li>Provide additional training for diagnostic tools.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div> {% endcomment %}
 </div>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('diagnosticChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ labels|safe }},
+            datasets: [{
+                label: 'Number of Diagnoses',
+                data: {{ data|safe }},
+                backgroundColor: 'rgba(135, 206, 250, 0.6)',
+                borderColor: 'rgba(0, 123, 255, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
 
 <!-- Custom CSS for Modern UI -->
 <style>
@@ -61,14 +55,6 @@
     .card:hover {
         transform: translateY(-5px);
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    }
-    .card-header {
-        border-radius: 0.5rem 0.5rem 0 0;
-    }
-    .img-fluid {
-        max-width: 100%;
-        height: auto;
-        border-radius: 0.5rem;
     }
 </style>
 {% endblock ml_block %}

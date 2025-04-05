@@ -1,127 +1,149 @@
 import os
-import io
-import cv2
 import numpy as np
 from PIL import Image as PILImage
+from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files.storage import FileSystemStorage
-from django.shortcuts import render, get_object_or_404
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.models import load_model
-from ml_project.settings import BASE_DIR
-from .models import Disease, Image, Diagnosis
-from django.contrib.auth import login, logout,authenticate
-from django.contrib.auth.views import LoginView
+from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
-import matplotlib.pyplot as plt
+from django.views.generic import View
+from django import forms
+from .models import Disease, Image, Diagnosis
+from keras.models import load_model
+from ml_project.settings import BASE_DIR
 
-# Disable GPU usage
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
-# Load disease model
-model_path = os.path.join(BASE_DIR, 'classifier', 'maize_disease_model.h5')
+# Load the ML model
+model = load_model(os.path.join(BASE_DIR, 'maize_disease_model.h5'))
 
 
-def process_image(filepath, target_size=(128, 128)):
-    """Efficient image processing"""
-    img = load_img(filepath, target_size=target_size)
-    img_array = img_to_array(img) / 255.0
-    return np.expand_dims(img_array, axis=0)
+class Login_View(View):
+    def get(self, request):
+        return render(request, 'login.html')
+
+    def post(self, request):
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            login(request, user)
+            messages.success(request, f"Welcome back, {username}!")
+            return redirect('ml_analyze')
+        
+        messages.error(request, "Invalid username or password.")
+        return render(request, 'login.html', {
+            'form_data': {'username': username or ''}
+        })
+
+def register_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Username already exists.")
+        elif User.objects.filter(email=email).exists():
+            messages.error(request, "Email already registered.")
+        else:
+            user = User.objects.create_user(username=username, email=email, password=password)
+            login(request, user)
+            messages.success(request, "Registration successful!")
+            return redirect('ml_analyze')
+        
+        return render(request, 'register.html', {
+            'form_data': {
+                'username': username or '',
+                'email': email or ''
+            }
+        })
+    
+    return render(request, 'register.html')
+
+@login_required
+def logout_view(request):
+    logout(request)
+    messages.info(request, "You have successfully logged out.")
+    return redirect('login')
+
+# ML Processing Functions
+def process_image(filepath):
+    """Process the uploaded image for prediction."""
+    img = PILImage.open(filepath).resize((128, 128))
+    img_array = np.array(img) / 255.0
+    return img_array.reshape(1, 128, 128, 3)
 
 @login_required
 def upload_image(request):
+    result = None  
     if request.method == 'POST' and request.FILES.get('image'):
         image_file = request.FILES['image']
-        
-        # Basic file validation
-        if not image_file.name.lower().endswith(('.png', '.jpg', '.jpeg')):
-            messages.error(request, "Only JPEG/PNG images allowed")
-            return render(request, 'upload.html')
-            
-        if image_file.size > 10 * 1024 * 1024:  # 10MB max
-            messages.error(request, "Image too large (max 10MB)")
-            return render(request, 'upload.html')
-        
         fs = FileSystemStorage()
         filename = fs.save(image_file.name, image_file)
         filepath = os.path.join(fs.location, filename)
 
         try:
+            # Process and predict
             img_array = process_image(filepath)
-            prediction = disease_model.predict(img_array, verbose=0)
-            class_idx = np.argmax(prediction)
-            confidence = float(np.max(prediction))
-            
-            # Save results
-            disease = get_object_or_404(Disease, pk=class_idx+1)
-            img_record = Image.objects.create(image=image_file)
+            prediction = model.predict(img_array)
+            predicted_class = np.argmax(prediction)
+            confidence_level = float(np.max(prediction))
+
+            # Get disease info
+            disease = get_object_or_404(Disease, pk=(predicted_class + 1))
+
+            # Save diagnosis
+            diagnosis_image = Image.objects.create(image=image_file)
             diagnosis = Diagnosis.objects.create(
                 disease=disease,
-                image=img_record,
-                confidence_level=confidence
+                image=diagnosis_image,
+                confidence_level=confidence_level
             )
+
             
-            # Prepare results
+            previous_scan = Diagnosis.objects.all().order_by('-created_at')
+            paginator = Paginator(previous_scan, 6) 
+            page = request.GET.get('page') 
+            previous_scan = paginator.get_page(page)
+
             result = {
+                'previous_scan': previous_scan,
                 'diagnosis': diagnosis,
-                'confidence_level': confidence,
-                'predicted_class': disease.name,
-                'disease_description': disease.description,
-                'symptoms': disease.symptoms,
-                'notes': disease.notes,
-                'image_url': img_record.image.url
+                'confidence_level': confidence_level,
+                'predicted_class': diagnosis.disease.name,
+                'disease_description': diagnosis.disease.description,
+                'symptoms': diagnosis.disease.symptoms,
+                'notes': diagnosis.disease.notes,
             }
-            
             return render(request, 'results.html', {'result': result})
-            
+
         except Exception as e:
+            messages.error(request, f"An error occurred: {str(e)}")
+            return render(request, 'upload.html', {'result': result})
+        
+        finally:
             if os.path.exists(filepath):
                 os.remove(filepath)
-            messages.error(request, f"Processing error: {str(e)}")
-    
-    return render(request, 'upload.html')
 
+    return render(request, 'upload.html', {'result': result})
 
 @login_required
 def diagnostic_stats(request):
-    """Generate diagnostic statistics"""
+    """Generate diagnostic statistics for the current user."""
     diseases = Disease.objects.all()
-    disease_counts = {disease.name: Diagnosis.objects.filter(disease=disease).count() 
-                     for disease in diseases}
+    if not diseases:
+        return render(request, 'diagnostic_stats.html', {'error': 'No diseases found.'})
 
-    plt.figure(figsize=(10, 5))
-    plt.bar(disease_counts.keys(), disease_counts.values(), color='skyblue')
-    plt.xlabel('Diseases')
-    plt.ylabel('Number of Diagnosis')
-    plt.title('Diagnosis Statistics')
-    plt.xticks(rotation=45)
+    disease_counts = {
+        disease.name: Diagnosis.objects.filter(
+            disease=disease, 
+        ).count() for disease in diseases
+    }
     
-    buffer = io.BytesIO()
-    plt.tight_layout()
-    plt.savefig(buffer, format='png')
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close
-
-
-class Login_View(LoginView):
-    template_name = 'login.html'
-
-def register_view(request):
-    if request.method == 'POST':
-        form = RegisterForm(request.POST)
-        if form.is_valid():
-            user = User.objects.create_user(
-                username=request.POST['username'],
-                email=request.POST['email'],
-                password=request.POST['password']
-            )
-            messages.success(request, 'Account created successfully!')
-            return redirect('login')
-    else:
-        form = RegisterForm()
-    return render(request, 'register.html', {'form': form})
-
-def logout_view(request):
-    logout(request)
-    return redirect('ml_analyze')
+    return render(request, 'diagnostic_stats.html', {
+        'labels': list(disease_counts.keys()),
+        'data': list(disease_counts.values())
+    })

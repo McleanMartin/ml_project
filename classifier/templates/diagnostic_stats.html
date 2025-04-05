@@ -22,6 +22,7 @@
 
 <!-- Include Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static "js/chart.js" %}"></script>
 <script>
     const ctx = document.getElementById('diagnosticChart').getContext('2d');
     const chart = new Chart(ctx, {
